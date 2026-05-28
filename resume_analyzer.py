@@ -1,17 +1,15 @@
 """
-Resume Analyzer — Core logic using Anthropic API
+Resume Analyzer — Core logic using Groq (free)
 """
 
 import os
-import base64
-from anthropic import Anthropic
-
-client = Anthropic()
+import json
+from groq import Groq
 
 SYSTEM_PROMPT = """You are an expert technical recruiter and career coach with 15 years of experience 
 hiring for top tech companies. You analyze resumes against job descriptions with precision and honesty.
 
-When analyzing, you always respond in this exact JSON format (no markdown, no preamble):
+You always respond in this exact JSON format (no markdown, no preamble, no backticks):
 {
   "match_score": <integer 0-100>,
   "verdict": "<one line overall assessment>",
@@ -23,15 +21,15 @@ When analyzing, you always respond in this exact JSON format (no markdown, no pr
 }"""
 
 
-def analyze_resume(resume_text: str, job_description: str) -> dict:
-    """Analyze resume against job description using Claude."""
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1500,
-        system=SYSTEM_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": f"""Analyze this resume against the job description below.
+def analyze_resume(resume_text: str, job_description: str, api_key: str) -> dict:
+    """Analyze resume against job description using Groq."""
+    client = Groq(api_key=api_key)
+    
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"""Analyze this resume against the job description below.
 
 RESUME:
 {resume_text}
@@ -39,12 +37,13 @@ RESUME:
 JOB DESCRIPTION:
 {job_description}
 
-Provide your analysis in the exact JSON format specified."""
-        }]
+Respond ONLY with the JSON object, nothing else."""}
+        ],
+        temperature=0.3,
+        max_tokens=1500,
     )
     
-    import json
-    text = response.content[0].text.strip()
+    text = response.choices[0].message.content.strip()
     text = text.replace("```json", "").replace("```", "").strip()
     return json.loads(text)
 
